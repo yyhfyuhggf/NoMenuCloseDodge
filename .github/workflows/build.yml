@@ -24,7 +24,7 @@ jobs:
         shell: pwsh
         run: git clone --branch ng --depth 1 https://github.com/alandtse/CommonLibSSE-NG.git extern/CommonLibSSE-NG
 
-      - name: Install dependencies (first run: about 10-25 min)
+      - name: Install dependencies (first run takes 10-25 minutes)
         shell: pwsh
         run: .\vcpkg\vcpkg.exe install fmt spdlog rapidcsv xbyak directxmath directxtk --triplet x64-windows-static-md
 
