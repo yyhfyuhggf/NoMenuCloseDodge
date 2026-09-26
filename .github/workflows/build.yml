@@ -1,0 +1,54 @@
+name: build
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Clone vcpkg
+        shell: pwsh
+        run: git clone --depth 1 https://github.com/microsoft/vcpkg.git vcpkg
+
+      - name: Bootstrap vcpkg
+        shell: pwsh
+        run: .\vcpkg\bootstrap-vcpkg.bat -disableMetrics
+
+      - name: Clone CommonLibSSE-NG
+        shell: pwsh
+        run: git clone --branch ng --depth 1 https://github.com/alandtse/CommonLibSSE-NG.git extern/CommonLibSSE-NG
+
+      - name: Install dependencies (first run: about 10-25 min)
+        shell: pwsh
+        run: .\vcpkg\vcpkg.exe install fmt spdlog rapidcsv xbyak directxmath directxtk --triplet x64-windows-static-md
+
+      - name: Configure
+        shell: pwsh
+        run: |
+          $toolchain = Join-Path $env:GITHUB_WORKSPACE 'vcpkg\scripts\buildsystems\vcpkg.cmake'
+          cmake -S . -B build -G "Visual Studio 17 2022" -A x64 "-DCMAKE_TOOLCHAIN_FILE=$toolchain" "-DVCPKG_TARGET_TRIPLET=x64-windows-static-md" -DBUILD_TESTS=OFF
+
+      - name: Build
+        shell: pwsh
+        run: cmake --build build --config Release
+
+      - name: Collect files
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path out\SKSE\Plugins | Out-Null
+          $dll = Get-ChildItem -Path build -Recurse -Filter NoMenuCloseDodge.dll | Select-Object -First 1
+          if (-not $dll) { throw 'NoMenuCloseDodge.dll not found' }
+          Copy-Item $dll.FullName out\SKSE\Plugins\NoMenuCloseDodge.dll
+          if (Test-Path NoMenuCloseDodge.ini) { Copy-Item NoMenuCloseDodge.ini out\SKSE\Plugins\NoMenuCloseDodge.ini }
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: NoMenuCloseDodge-MOD
+          path: out
