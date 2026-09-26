@@ -44,7 +44,41 @@ target_include_directories(
 		${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-# Source files contain UTF-8 (Chinese comments) - tell MSVC explicitly.
 if(MSVC)
-	target_compile_options(${PROJECT_NAME} PRIVATE /utf-8)
+	# -----------------------------------------------------------------------
+	# CommonLibSSE-NG 自动生成的插件 TU（__<PROJECT>Plugin.cpp）只 include 了
+	# REL/Version.h，而该头文件本身并不 include <cstdint>/<array>/<string_view>
+	# 等标准库头（上游自己的工程是靠预编译头把标准库头先塞进去的）。
+	# 结果就是 MSVC 报一大串：
+	#     error C2039: 'uint16_t': is not a member of 'std'
+	#     error C2039: 'array'   : is not a member of 'std'
+	# 这里给本 target 的所有源文件（含自动生成的那个）强制前置包含一组标准库头。
+	# -----------------------------------------------------------------------
+	set(_forced_std_header "${CMAKE_CURRENT_BINARY_DIR}/ForcedStdHeaders.h")
+	file(WRITE "${_forced_std_header}"
+		"#pragma once\n"
+		"#include <cstddef>\n"
+		"#include <cstdint>\n"
+		"#include <array>\n"
+		"#include <string>\n"
+		"#include <string_view>\n"
+		"#include <compare>\n"
+		"#include <stdexcept>\n"
+		"#include <functional>\n"
+		"#include <algorithm>\n"
+		"#include <charconv>\n"
+		"#include <type_traits>\n"
+		"#include <utility>\n"
+		"#include <memory>\n"
+		"#include <limits>\n"
+		"#include <optional>\n"
+		"#include <vector>\n"
+		"#include <system_error>\n"
+		"#include <cctype>\n"
+		"#include <chrono>\n"
+		"#include <filesystem>\n"
+		"#include <fstream>\n")
+
+	# 源文件里有中文注释（UTF-8），显式告诉 MSVC
+	target_compile_options(${PROJECT_NAME} PRIVATE "/FI${_forced_std_header}" /utf-8)
 endif()
